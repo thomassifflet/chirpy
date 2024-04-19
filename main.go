@@ -1,68 +1,43 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 )
 
 type apiConfig struct {
 	fileserverHits int
-	reset          (int)
-}
-
-func (cfg *apiConfig) middleWareMetricsIncrement(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cfg.fileserverHits++
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (cfg *apiConfig) resetMetrics() {
-	cfg.fileserverHits = 0
-}
-
-func (cfg *apiConfig) handleResetMetrics(w http.ResponseWriter, r *http.Request) {
-	cfg.resetMetrics()
-	hitsCount := fmt.Sprintf("Hits count has been reset")
-	w.Header().Set("Content-Type", "text/plain charset=utf-8")
-	w.Write([]byte(hitsCount))
-}
-
-func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	hitsCount := fmt.Sprintf("Hits: %d", cfg.fileserverHits)
-	w.Header().Set("Content-Type", "text/plain charset=utf-8")
-	w.Write([]byte(hitsCount))
-
-}
-
-func middlewareCors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
 
 func main() {
+	const filepathRoot = "."
+	const port = "8080"
+
+	apiCfg := apiConfig{
+		fileserverHits: 0,
+	}
+
 	mux := http.NewServeMux()
+	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	adminHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/admin", http.FileServer(http.Dir(filepathRoot))))
+	mux.Handle("/app/*", fsHandler)
+	mux.Handle("/admin/*", adminHandler)
+
+	// GET Routes
+	mux.HandleFunc("GET /api/healthz", handlerReadiness)
+	mux.HandleFunc("GET /api/reset", apiCfg.handlerReset)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
+
+	//POST Routes
+	mux.HandleFunc("POST /api/validate_chirp", chirpHandler)
+
 	corsMux := middlewareCors(mux)
-	apiCfg := apiConfig{}
 
-	fileServer := http.FileServer(http.Dir("."))
-	mux.Handle("/app/", apiCfg.middleWareMetricsIncrement(http.StripPrefix("/app/", fileServer)))
-	mux.HandleFunc("/metrics", apiCfg.handleMetrics)
-	mux.HandleFunc("/reset", apiCfg.handleResetMetrics)
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte("OK"))
-	})
-	fmt.Println("Started server on port 8080..")
-	log.Fatal(http.ListenAndServe(":8080", corsMux))
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: corsMux,
+	}
 
+	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
+	log.Fatal(srv.ListenAndServe())
 }
