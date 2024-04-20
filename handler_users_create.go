@@ -1,21 +1,27 @@
 package main
 
 import (
-	"bcrypt"
 	"encoding/json"
+	"errors"
 	"net/http"
+
+	"github.com/thomassifflet/chirpy/internal/auth"
+	"github.com/thomassifflet/chirpy/internal/database"
 )
 
 type User struct {
 	ID       int    `json:"id"`
 	Email    string `json:"email"`
-	Password string `json:"password"`
+	Password string `json:"-"`
 }
 
 func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email    string `json:"email"`
 		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+	type response struct {
+		User
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -25,15 +31,28 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
 		return
 	}
-	hashedPassword := bcrypt.GenerateFromPassword(params.Password)
-	user, err := cfg.DB.CreateUser(params.Email, params.Password)
+
+	hashedPassword, err := auth.HashPassword(params.Password)
 	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password")
+		return
+	}
+
+	user, err := cfg.DB.CreateUser(params.Email, hashedPassword)
+	if err != nil {
+		if errors.Is(err, database.ErrAlreadyExists) {
+			respondWithError(w, http.StatusConflict, "User already exists")
+			return
+		}
+
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create user")
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, User{
-		ID:    user.ID,
-		Email: user.Email,
+	respondWithJSON(w, http.StatusCreated, response{
+		User: User{
+			ID:    user.ID,
+			Email: user.Email,
+		},
 	})
 }
