@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/thomassifflet/chirpy/internal/auth"
 )
 
@@ -13,8 +16,11 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		Email           string `json:"email"`
 		ExpireInSeconds int    `json:"expire_in_seconds"`
 	}
-	type response struct {
-		User
+
+	type LoginResponse struct {
+		ID    int    `json:"id"`
+		Email string `json:"email"`
+		Token string `json:"token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -37,10 +43,30 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, response{
-		User: User{
-			ID:    user.ID,
-			Email: user.Email,
-		},
-	})
+	expiresAt := 86400
+	if params.ExpireInSeconds > 0 && params.ExpireInSeconds <= 86400 {
+		expiresAt = params.ExpireInSeconds
+	}
+
+	claims := &jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expiresAt) * time.Second)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Issuer:    "chirpy",
+		Subject:   fmt.Sprintf("%v", user.ID),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	ss, err := token.SignedString([]byte(cfg.JwtSecret))
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not sign token")
+		return
+	}
+
+	loginResp := LoginResponse{
+		ID:    user.ID,
+		Email: user.Email,
+		Token: ss,
+	}
+
+	respondWithJSON(w, http.StatusOK, loginResp)
 }
