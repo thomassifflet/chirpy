@@ -9,8 +9,9 @@ import (
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password        string `json:"password"`
+		Email           string `json:"email"`
+		ExpireInSeconds int    `json:"expire_in_seconds"`
 	}
 	type response struct {
 		User
