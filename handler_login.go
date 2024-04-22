@@ -47,10 +47,14 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		params.ExpiresInSeconds = defaultExpiration
 	}
 
-	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Duration(params.ExpiresInSeconds)*time.Second)
+	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, "chirpy-access", time.Duration(params.ExpiresInSeconds)*time.Second)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create JWT")
 		return
+	}
+	refreshToken, err := auth.MakeJWT(user.ID, cfg.jwtSecret, "chirpy-refreh", 1440*time.Hour)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldn't create refresh jwt")
 	}
 
 	respondWithJSON(w, http.StatusOK, response{

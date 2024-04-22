@@ -29,11 +29,11 @@ func CheckPasswordHash(password, hash string) error {
 }
 
 // MakeJWT -
-func MakeJWT(userID int, tokenSecret string, expiresIn time.Duration) (string, error) {
+func MakeJWT(userID int, tokenSecret string, issuer string, expiresIn time.Duration) (string, error) {
 	signingKey := []byte(tokenSecret)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy",
+		Issuer:    issuer,
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
 		Subject:   fmt.Sprintf("%d", userID),
@@ -42,7 +42,7 @@ func MakeJWT(userID int, tokenSecret string, expiresIn time.Duration) (string, e
 }
 
 // ValidateJWT -
-func ValidateJWT(tokenString, tokenSecret string) (string, error) {
+func ValidateJWT(tokenString, tokenSecret, expectedIssuer string) (string, error) {
 	claimsStruct := jwt.RegisteredClaims{}
 	token, err := jwt.ParseWithClaims(
 		tokenString,
@@ -56,6 +56,10 @@ func ValidateJWT(tokenString, tokenSecret string) (string, error) {
 	userIDString, err := token.Claims.GetSubject()
 	if err != nil {
 		return "", err
+	}
+
+	if claimsStruct.Issuer != expectedIssuer {
+		return "", fmt.Errorf("unexpected issuer: expected %s, got %s", expectedIssuer, claimsStruct.Issuer)
 	}
 
 	return userIDString, nil
