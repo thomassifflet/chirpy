@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"github.com/thomassifflet/chirpy/internal/auth"
 )
 
 type Chirp struct {
-	ID   int    `json:"id"`
-	Body string `json:"body"`
+	ID       int    `json:"id"`
+	Body     string `json:"body"`
+	AuthorID int    `json:"author_id"`
 }
 
 func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) {
@@ -22,6 +26,24 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request
 	err := decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+		return
+	}
+
+	userToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "user unauthorized to create a chirp")
+		return
+	}
+
+	userID, err := auth.ValidateJWT(userToken, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "unable to verify jwt token")
+		return
+	}
+
+	userIDConv, err := strconv.Atoi(userID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not convert userID to integer")
 		return
 	}
 
@@ -38,8 +60,9 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request
 	}
 
 	respondWithJSON(w, http.StatusCreated, Chirp{
-		ID:   chirp.ID,
-		Body: chirp.Body,
+		ID:       chirp.ID,
+		Body:     chirp.Body,
+		AuthorID: userIDConv,
 	})
 }
 
