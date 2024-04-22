@@ -1,12 +1,24 @@
 package database
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 type User struct {
-	ID             int    `json:"id"`
-	Email          string `json:"email"`
-	HashedPassword string `json:"hashed_password"`
-	Token          string `json:"token"`
+	ID             int       `json:"id"`
+	Email          string    `json:"email"`
+	HashedPassword string    `json:"hashed_password"`
+	Token          string    `json:"token"`
+	RefreshedAt    time.Time `json:"refreshed_at"`
+}
+
+type RefreshToken struct {
+	TokenID   string     `json:"token_id"`
+	UserID    int        `json:"user_id"`
+	Revoked   bool       `json:"revoked"`
+	CreatedAt time.Time  `json:"created_at"`
+	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 }
 
 var ErrAlreadyExists = errors.New("already exists")

@@ -2,44 +2,54 @@ package main
 
 import (
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/thomassifflet/chirpy/internal/auth"
 )
 
-func (cfg *apiConfig) handlerRefreshToken(w http.ResponseWriter, r *http.Request) {
-
+func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 	type response struct {
 		Token string `json:"token"`
 	}
 
 	refreshToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Couldn't find JWT")
+		respondWithError(w, http.StatusBadRequest, "Couldn't find JWT")
 		return
 	}
 
-	strUserID, err := auth.ValidateJWT(refreshToken, cfg.jwtSecret, "chirpy-refresh")
+	isRevoked, err := cfg.DB.IsTokenRevoked(refreshToken)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "invalid token")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't check session")
+		return
+	}
+	if isRevoked {
+		respondWithError(w, http.StatusUnauthorized, "Refresh token is revoked")
 		return
 	}
 
-	userID, convErr := strconv.Atoi(strUserID)
-	if convErr != nil {
-		respondWithError(w, http.StatusInternalServerError, "user id conversion error")
-		return
-	}
-
-	newAccessToken, err := auth.MakeJWT(userID, cfg.jwtSecret, "chirpy-access", time.Hour)
+	accessToken, err := auth.RefreshToken(refreshToken, cfg.jwtSecret)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "couldn't create jwt")
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT")
 		return
 	}
 
 	respondWithJSON(w, http.StatusOK, response{
-		Token: newAccessToken,
+		Token: accessToken,
 	})
+}
 
+func (cfg *apiConfig) handlerRevoke(w http.ResponseWriter, r *http.Request) {
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't find JWT")
+		return
+	}
+
+	err = cfg.DB.RevokeToken(refreshToken)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't revoke session")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, struct{}{})
 }
