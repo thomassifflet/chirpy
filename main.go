@@ -23,8 +23,13 @@ func main() {
 	godotenv.Load(".env")
 
 	jwtSecret := os.Getenv("JWT_SECRET")
+	polkaAPIKey := os.Getenv("POLKA_API_KEY")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET environment variable is not set")
+	}
+
+	if polkaAPIKey == "" {
+		log.Fatal("POLKA_API_KEY env variable is not set")
 	}
 
 	db, err := database.NewDB("database.json")

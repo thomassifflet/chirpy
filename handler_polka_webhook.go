@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/thomassifflet/chirpy/internal/auth"
 	"github.com/thomassifflet/chirpy/internal/database"
 )
 
@@ -14,6 +15,11 @@ func (cfg *apiConfig) handlerWebhook(w http.ResponseWriter, r *http.Request) {
 		Data  struct {
 			UserID int `json:"user_id"`
 		}
+	}
+
+	_, er := auth.GetAPIKey(r.Header)
+	if er != nil {
+		respondWithError(w, http.StatusUnauthorized, "no api key present")
 	}
 
 	decoder := json.NewDecoder(r.Body)
