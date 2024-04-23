@@ -20,6 +20,7 @@ func (cfg *apiConfig) handlerWebhook(w http.ResponseWriter, r *http.Request) {
 	_, er := auth.GetAPIKey(r.Header)
 	if er != nil {
 		respondWithError(w, http.StatusUnauthorized, "no api key present")
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
