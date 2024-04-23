@@ -11,6 +11,7 @@ type User struct {
 	HashedPassword string    `json:"hashed_password"`
 	Token          string    `json:"token"`
 	RefreshedAt    time.Time `json:"refreshed_at"`
+	IsChirpyRed    bool      `json:"is_chirpy_red"`
 }
 
 type RefreshToken struct {

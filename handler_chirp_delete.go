@@ -44,7 +44,7 @@ func (cfg *apiConfig) handlerChirpDelete(w http.ResponseWriter, r *http.Request)
 	}
 
 	fmt.Printf("Chirp author ID : %v, UserID : %v", dbChirp.AuthorID, userID)
-	deletedChirp, err := cfg.DB.DeleteChirp(chirpID)
+	deletedChirp, err := cfg.DB.DeleteChirp(chirpID, dbChirp.AuthorID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not delete chirp")
 		return
